@@ -1,78 +1,54 @@
 package arraypool
 
-type item struct {
-	offset int64
-	length int64
-	contentLength int64
-	deleted bool
-}
+import (
+	"errors"
+)
 
 type ArrayPool struct {
-	size int64
-	segmentSize int64
-	items []item
-	buffer []byte
+	available chan []byte
+	width     int64
+	maxSize   int64
 }
 
-func NewArrayPool(size int64, segmentSize int64) *ArrayPool {
+func NewArrayPool(maxSize int64, initialSize int64, width int64) (*ArrayPool, error) {
+
+	if maxSize < initialSize {
+		return nil, errors.New("Invalid max size")
+	}
+
+	if initialSize < width {
+		return nil, errors.New("Invalid initial size")
+	}
+
 	return &ArrayPool{
-		size:        size,
-		segmentSize: segmentSize,
-		items:       make([]item, 1000),
-		buffer:      make([]byte, size),
-	}
+		available: make(chan []byte, initialSize),
+		width:     width,
+		maxSize:   maxSize,
+	}, nil
 }
 
-func (ap *ArrayPool) Rent(size int64) int64 {
+func (ap *ArrayPool) Rent() []byte {
 
-	// the index of visited items
-	var indexVisited int64 = 0
-	for _, item := range ap.items {
-		indexVisited += item.length
+	// check if any available byte array exists
 
-		// if deleted
-		if !item.deleted {
-			continue
-		}
-
-		// if size doesn't match
-		if item.length < size {
-			continue
-		}
-
-		return item.offset
+	select {
+	case b := <-ap.available:
+		return b
+	default:
+		return ap.createNewByteArray()
 	}
 
-	// not item was found we must create a new item
-	ap.items = append(ap.items, item{
-		offset:        indexVisited,
-		length:        getSizeInSegment(size, ap.segmentSize),
-		contentLength: size,
-		deleted:       false,
-	})
+}
 
-	// check if byte array size is enough
-	if ap.size >= indexVisited + getSizeInSegment(size, ap.segmentSize) {
-		return indexVisited
+func (ap *ArrayPool) createNewByteArray() []byte {
+	return make([]byte, ap.width)
+}
+
+func (ap *ArrayPool) Release(ba []byte) {
+	select {
+	case ap.available <- ba:
+		break
+	default:
+		break
 	}
-
-	// if not expand the array pool
-	newByteArr := make([]byte, ap.size * 2)
-	ap.size = ap.size * 2
-	ap.buffer = newByteArr
-
-	return indexVisited
-}
-
-func getSizeInSegment(size int64, segmentSize int64) int64 {
-	remaining := size % segmentSize
-	return remaining + 1
-}
-
-func RetrieveContent(index int64) []byte {
-
-}
-
-func Release(index int64) {
-
 }
