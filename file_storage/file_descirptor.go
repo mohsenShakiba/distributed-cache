@@ -6,7 +6,7 @@ import (
 )
 
 type fileDescriptor struct {
-	file *os.File
+	file     *os.File
 	fileInfo os.FileInfo
 }
 
