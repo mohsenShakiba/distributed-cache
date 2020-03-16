@@ -22,3 +22,19 @@ func (ce *CacheEntry) Serialize() ([]byte, error) {
 func (cs *CacheEntry) Deserialize(line []byte) error {
 	return json.Unmarshal(line, cs)
 }
+
+func Unique(entries []*CacheEntry) []*CacheEntry {
+	updatedEntriesSet := make(map[string]*CacheEntry, 0)
+
+	for _, updatedEntry := range entries {
+		updatedEntriesSet[updatedEntry.Key] = updatedEntry
+	}
+
+	updatedEntriesList := make([]*CacheEntry, 0, len(updatedEntriesSet))
+
+	for _, value := range updatedEntriesSet {
+		updatedEntriesList = append(updatedEntriesList, value)
+	}
+
+	return updatedEntriesList
+}
