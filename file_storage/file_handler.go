@@ -1,7 +1,6 @@
 package file_storage
 
 import (
-	"fmt"
 	"os"
 	"sort"
 	"strconv"
@@ -13,8 +12,8 @@ type fileHandler struct {
 	path               string
 	prefix             string
 	maxFileSize        int64
-	listOfAllFiles     []fileDescriptor
-	currentWorkingFile fileDescriptor
+	listOfAllFiles     []*fileDescriptor
+	currentWorkingFile *fileDescriptor
 }
 
 func newFileHandler(path string, prefix string, maxFileSize int64) *fileHandler {
@@ -46,7 +45,7 @@ func (fh *fileHandler) init() {
 			panic(err)
 		}
 
-		fileList := make([]fileDescriptor, 0, 100)
+		fileList := make([]*fileDescriptor, 0, 100)
 		for _, fileInfo := range list {
 
 			if fileInfo.IsDir() {
@@ -64,9 +63,7 @@ func (fh *fileHandler) init() {
 				panic(err)
 			}
 
-			fDescriptor := fileDescriptor{file: file, fileInfo: fileInfo}
-
-			fmt.Println("adding file with name", fileInfo.Name())
+			fDescriptor := newFileDescriptor(file)
 
 			fileList = append(fileList, fDescriptor)
 		}
@@ -87,13 +84,7 @@ func (fh *fileHandler) init() {
 			panic(err)
 		}
 
-		fi, err := f.Stat()
-
-		if err != nil {
-			panic(err)
-		}
-
-		fh.listOfAllFiles = append(fh.listOfAllFiles, fileDescriptor{file: f, fileInfo: fi})
+		fh.listOfAllFiles = append(fh.listOfAllFiles, newFileDescriptor(f))
 	}
 
 	fh.currentWorkingFile = fh.listOfAllFiles[len(fh.listOfAllFiles)-1]
@@ -102,19 +93,6 @@ func (fh *fileHandler) init() {
 
 func (fh *fileHandler) write(content []byte) {
 	fh.init()
-
-	_, err := fh.currentWorkingFile.file.Write(content)
-	_, err = fh.currentWorkingFile.file.Write([]byte("\n"))
-
-	if err != nil {
-		fmt.Println("error while trying to write to file", err)
-	}
-
-}
-
-func (fh *fileHandler) clear() {
-	for _, i := range fh.listOfAllFiles {
-		fmt.Println("removing file", i.fileInfo.Name())
-		os.Remove(fh.path + "/" + i.fileInfo.Name())
-	}
+	fh.currentWorkingFile.write(content)
+	fh.currentWorkingFile.write([]byte("\n"))
 }

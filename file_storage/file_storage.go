@@ -4,14 +4,18 @@ import (
 	"bufio"
 	"encoding/json"
 	"fmt"
-	"github.com/mohsenShakiba/distributed-cache/storage"
+	"os"
+	"sync"
 	"time"
+
+	"github.com/mohsenShakiba/distributed-cache/storage"
 )
 
 type FileCacheStorage struct {
 	FlushInterval        int
 	fh                   *fileHandler
 	listOfUpdatedEntries []*storage.CacheEntry
+	mutex                sync.Mutex
 }
 
 func NewFileCacheStorage(path string, maxFileSize int64, flushDuration time.Duration) *FileCacheStorage {
@@ -50,7 +54,7 @@ func (fcs *FileCacheStorage) ParseAllEntries() ([]*storage.CacheEntry, error) {
 		}
 	}
 
-	return entries, nil
+	return storage.Unique(entries), nil
 }
 
 func (fcs *FileCacheStorage) setupFlushTimer(flushDuration time.Duration) {
@@ -61,17 +65,31 @@ func (fcs *FileCacheStorage) setupFlushTimer(flushDuration time.Duration) {
 	}
 }
 
-func (fcs *FileCacheStorage) compressFiles() {
+func (fcs *FileCacheStorage) ClearAndWriteAll(allEntries []*storage.CacheEntry) {
+
+	fcs.mutex.Lock()
+
+	defer fcs.mutex.Unlock()
+
+	// remove all the previous files
+	for _, f := range fcs.fh.listOfAllFiles {
+		os.Remove(f.file.Name())
+	}
+
+	// call init to create new file
+	for _, entry := range allEntries {
+		data, _ := entry.Serialize()
+		fcs.fh.write(data)
+	}
 
 }
 
 func (fcs *FileCacheStorage) flushUpdatedEntries() {
 
-	updatedEntries := make(map[string]*storage.CacheEntry, 0)
+	fcs.mutex.Lock()
+	defer fcs.mutex.Unlock()
 
-	for _, updatedEntry := range fcs.listOfUpdatedEntries {
-		updatedEntries[updatedEntry.Key] = updatedEntry
-	}
+	updatedEntries := storage.Unique(fcs.listOfUpdatedEntries)
 
 	for _, value := range updatedEntries {
 		data, err := value.Serialize()
