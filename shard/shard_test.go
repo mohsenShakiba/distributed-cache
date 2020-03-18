@@ -7,7 +7,7 @@ import (
 )
 
 func TestAddingAndGetingItems(t *testing.T) {
-	shard, err := createNewShard(100, 128, make(chan<- *storage.CacheEntry, 100))
+	shard, err := NewShard(100, 128, make(chan<- *storage.CacheEntry, 100))
 
 	if err != nil {
 		t.Error(err)
@@ -42,7 +42,7 @@ func TestUpdatedItemsChan(t *testing.T) {
 
 	ch := make(chan *storage.CacheEntry, 100)
 
-	shard, err := createNewShard(100, 128, ch)
+	shard, err := NewShard(100, 128, ch)
 
 	if err != nil {
 		t.Error(err)
@@ -72,7 +72,7 @@ func TestUpdatedItemsChan(t *testing.T) {
 }
 
 func TestGettingAllItems(t *testing.T) {
-	shard, err := createNewShard(100, 128, make(chan<- *storage.CacheEntry, 100))
+	shard, err := NewShard(100, 128, make(chan<- *storage.CacheEntry, 100))
 
 	if err != nil {
 		t.Error(err)

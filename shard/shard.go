@@ -25,7 +25,7 @@ type Shard struct {
 	updatedEntriesChan chan<- *storage.CacheEntry
 }
 
-func createNewShard(initialSize int64, baseSegmentSize int, updatedEntriesChan chan<- *storage.CacheEntry) (*Shard, error) {
+func NewShard(initialSize int64, baseSegmentSize int, updatedEntriesChan chan<- *storage.CacheEntry) (*Shard, error) {
 	arrPool := arraypool.NewArrayPool(baseSegmentSize)
 
 	return &Shard{
