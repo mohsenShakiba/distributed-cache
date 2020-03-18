@@ -59,7 +59,7 @@ func (c *Cache) initFromStorage() {
 	}
 
 	for _, entry := range entries {
-		c.set(entry.Key, entry.Value)
+		c.set(entry.Key, entry.Value, entry.Expiration)
 	}
 }
 
@@ -70,14 +70,16 @@ func (c *Cache) hashOfKey(key string) int {
 	return hash32 % c.options.NumberOfSegments
 }
 
-func (c *Cache) set(key string, value []byte) error {
+func (c *Cache) set(key string, value []byte, expiration time.Time) error {
 
 	hashOfKey := c.hashOfKey(key)
 
-	shard := c.segments[hashOfKey]
+	sh := c.segments[hashOfKey]
 
-	if shard == nil {
+	if sh == nil {
+
 		seg, err := shard.NewShard(c.options.InitialSegmentSize, c.options.SegmentWidth, c.updatedEntriesChan)
+
 		if err != nil {
 			return err
 		}
@@ -85,37 +87,52 @@ func (c *Cache) set(key string, value []byte) error {
 		fmt.Printf("creating a new shard for width %v \n", c.options.SegmentWidth)
 
 		c.segments[hashOfKey] = seg
-		shard = seg
+		sh = seg
 	}
 
-	shard.Add(key, value)
+	sh.Add(key, value, expiration)
 
 	return nil
 }
 
-func (c *Cache) Set(key string, value []byte) error {
+func (c *Cache) SetWithExpiration(key string, value []byte, duration time.Duration) error {
 
-	err := c.set(key, value)
+	err := c.set(key, value, time.Now().Add(duration))
 
 	c.Storage.OnEntryUpdated(&storage.CacheEntry{
 		Key:        key,
 		Value:      value,
-		Expiration: time.Now().Add(time.Second * 10),
+		Expiration: time.Now().Add(duration),
 		Deleted:    false,
 	})
 
 	return err
 }
 
+func (c *Cache) Set(key string, value []byte) error {
+	return c.SetWithExpiration(key, value, time.Hour*1024*24)
+}
+
 func (c *Cache) Get(key string) []byte {
+	value, _ := c.getWithDetail(key)
+	return value
+}
 
-	hashOfKey := c.hashOfKey(key)
+func (c *Cache) getWithDetail(key string) (value []byte, shardIndex int) {
+	shardIndex = c.hashOfKey(key)
+	shard := c.segments[shardIndex]
 
-	segment := c.segments[hashOfKey]
-
-	if segment == nil {
-		return nil
+	if shard == nil {
+		value = nil
+		return
 	}
 
-	return segment.Get(key)
+	value = shard.Get(key)
+	return
+}
+
+func (c *Cache) Delete(key string) {
+	shardIndex := c.hashOfKey(key)
+	shard := c.segments[shardIndex]
+	shard.Delete(key)
 }

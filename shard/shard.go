@@ -41,7 +41,7 @@ func hashKey(key string) uint32 {
 	return h.Sum32()
 }
 
-func (s *Shard) Add(key string, value []byte) {
+func (s *Shard) Add(key string, value []byte, expiration time.Time) {
 
 	hashedKey := hashKey(key)
 
@@ -61,7 +61,7 @@ func (s *Shard) Add(key string, value []byte) {
 
 	s.hits += 1
 
-	entry := Entry{key: key, value: value, exp: time.Now().Add(time.Second * 10), deleted: false}
+	entry := Entry{key: key, value: data, exp: expiration, deleted: false}
 
 	s.mapping[hashedKey] = entry
 
@@ -77,6 +77,10 @@ func (s *Shard) Get(key string) []byte {
 	if val, ok := s.mapping[hashedKey]; ok {
 
 		lengthArr := val.value[:8]
+
+		if val.exp.Sub(time.Now()) < 0 {
+			return nil
+		}
 
 		length := binary.LittleEndian.Uint64(lengthArr)
 

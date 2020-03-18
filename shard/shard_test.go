@@ -2,6 +2,7 @@ package shard
 
 import (
 	"testing"
+	"time"
 
 	"github.com/mohsenShakiba/distributed-cache/storage"
 )
@@ -13,7 +14,7 @@ func TestAddingAndGetingItems(t *testing.T) {
 		t.Error(err)
 	}
 
-	shard.Add("test", []byte("1"))
+	shard.Add("test", []byte("1"), time.Now().Add(time.Minute))
 
 	res := shard.Get("test")
 
@@ -21,7 +22,7 @@ func TestAddingAndGetingItems(t *testing.T) {
 		t.Error("the expected value was not returned")
 	}
 
-	shard.Add("test", []byte("2"))
+	shard.Add("test", []byte("2"), time.Now().Add(time.Minute))
 
 	res2 := shard.Get("test")
 
@@ -36,6 +37,16 @@ func TestAddingAndGetingItems(t *testing.T) {
 	if res3 != nil {
 		t.Error("the expected value was not returned")
 	}
+
+	shard.Add("test", []byte("1"), time.Now().Add(time.Second))
+
+	time.Sleep(time.Second)
+
+	res4 := shard.Get("test")
+
+	if res4 != nil {
+		t.Error("the entry wasn't expirated")
+	}
 }
 
 func TestUpdatedItemsChan(t *testing.T) {
@@ -48,8 +59,8 @@ func TestUpdatedItemsChan(t *testing.T) {
 		t.Error(err)
 	}
 
-	shard.Add("test", []byte("1"))
-	shard.Add("test", []byte("2"))
+	shard.Add("test", []byte("1"), time.Now().Add(time.Minute))
+	shard.Add("test", []byte("2"), time.Now().Add(time.Minute))
 
 	shard.Delete("test")
 
@@ -78,7 +89,7 @@ func TestGettingAllItems(t *testing.T) {
 		t.Error(err)
 	}
 
-	shard.Add("test", []byte("1"))
+	shard.Add("test", []byte("1"), time.Now().Add(time.Minute))
 
 	items := shard.getAllCacheEntries()
 
@@ -92,7 +103,7 @@ func TestGettingAllItems(t *testing.T) {
 		t.Error("wrong entry was given")
 	}
 
-	shard.Add("test", []byte("2"))
+	shard.Add("test", []byte("2"), time.Now().Add(time.Minute))
 
 	items = shard.getAllCacheEntries()
 
@@ -106,7 +117,7 @@ func TestGettingAllItems(t *testing.T) {
 		t.Error("wrong entry was given")
 	}
 
-	shard.Add("test2", []byte("1"))
+	shard.Add("test2", []byte("1"), time.Now().Add(time.Minute))
 
 	items = shard.getAllCacheEntries()
 
