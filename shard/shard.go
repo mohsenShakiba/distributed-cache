@@ -1,26 +1,36 @@
 package shard
 
 import (
-	"../arraypool"
 	"encoding/binary"
 	"hash/fnv"
 	"sync"
+	"time"
+
+	"github.com/mohsenShakiba/distributed-cache/arraypool"
+	"github.com/mohsenShakiba/distributed-cache/storage"
 )
+
+type Entry struct {
+	key     string
+	value   []byte
+	exp     time.Time
+	deleted bool
+}
 
 type Shard struct {
 	arrayPool          *arraypool.ArrayPool
-	mapping            map[uint32][]byte
+	mapping            map[uint32]Entry
 	mutex              sync.Mutex
 	hits               int64
-	updatedEntriesChan chan<- EntryStatus
+	updatedEntriesChan chan<- *storage.CacheEntry
 }
 
-func createNewShard(initialSize int64, baseSegmentSize int, updatedEntriesChan chan<- EntryStatus) (*Shard, error) {
+func createNewShard(initialSize int64, baseSegmentSize int, updatedEntriesChan chan<- *storage.CacheEntry) (*Shard, error) {
 	arrPool := arraypool.NewArrayPool(baseSegmentSize)
 
 	return &Shard{
 		arrayPool:          arrPool,
-		mapping:            make(map[uint32][]byte, initialSize),
+		mapping:            make(map[uint32]Entry, initialSize),
 		updatedEntriesChan: updatedEntriesChan,
 	}, nil
 }
@@ -39,8 +49,8 @@ func (s *Shard) Add(key string, value []byte) {
 	defer s.mutex.Unlock()
 
 	// check if a entry already exists
-	if bytes, ok := s.mapping[hashedKey]; ok {
-		s.arrayPool.Release(bytes)
+	if val, ok := s.mapping[hashedKey]; ok {
+		s.arrayPool.Release(val.value)
 	}
 
 	data := s.arrayPool.Rent(len(value) + 8)
@@ -51,9 +61,11 @@ func (s *Shard) Add(key string, value []byte) {
 
 	s.hits += 1
 
-	s.mapping[hashedKey] = data
+	entry := Entry{key: key, value: value, exp: time.Now().Add(time.Second * 10), deleted: false}
 
-	s.onEntryUpdated(hashedKey, false)
+	s.mapping[hashedKey] = entry
+
+	s.onEntryUpdated(entry)
 }
 
 func (s *Shard) Get(key string) []byte {
@@ -62,18 +74,56 @@ func (s *Shard) Get(key string) []byte {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
-	if bytes, ok := s.mapping[hashedKey]; ok {
+	if val, ok := s.mapping[hashedKey]; ok {
 
-		lengthArr := bytes[:8]
+		lengthArr := val.value[:8]
 
 		length := binary.LittleEndian.Uint64(lengthArr)
 
-		return bytes[8 : 8+length]
+		return val.value[8 : 8+length]
 	}
 
 	return nil
 }
 
-func (s *Shard) onEntryUpdated(key uint32, deleted bool) {
-	s.updatedEntriesChan <- EntryStatus{hashedKey: key, deleted: deleted}
+func (s *Shard) Delete(key string) {
+
+	hashedKey := hashKey(key)
+
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+
+	delete(s.mapping, hashedKey)
+
+	entry := Entry{key: key, value: nil, exp: time.Now(), deleted: true}
+
+	s.onEntryUpdated(entry)
+
+}
+
+func (s *Shard) onEntryUpdated(e Entry) {
+	s.updatedEntriesChan <- &storage.CacheEntry{
+		Key:        e.key,
+		Deleted:    e.deleted,
+		Expiration: e.exp,
+		Value:      e.value,
+	}
+}
+
+func (s *Shard) getAllCacheEntries() []*storage.CacheEntry {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+
+	entries := make([]*storage.CacheEntry, 0, 1000)
+
+	for _, val := range s.mapping {
+		entries = append(entries, &storage.CacheEntry{
+			Key:        val.key,
+			Deleted:    val.deleted,
+			Expiration: val.exp,
+			Value:      val.value,
+		})
+	}
+
+	return entries
 }

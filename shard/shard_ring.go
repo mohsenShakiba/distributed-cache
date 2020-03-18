@@ -1,17 +1,18 @@
 package shard
 
 import (
-	"../file_storage"
-	"../storage"
 	"fmt"
 	"hash/fnv"
 	"time"
+
+	"github.com/mohsenShakiba/distributed-cache/file_storage"
+	"github.com/mohsenShakiba/distributed-cache/storage"
 )
 
 type ShardRing struct {
 	segments           []*Shard
 	options            ShardRingConfig
-	updatedEntriesChan chan EntryStatus
+	updatedEntriesChan chan *storage.CacheEntry
 	Storage            *file_storage.FileCacheStorage
 }
 
@@ -28,13 +29,25 @@ func CreateNewSegmentPool(config ShardRingConfig) *ShardRing {
 	sr := &ShardRing{
 		segments:           make([]*Shard, config.NumberOfSegments),
 		options:            config,
-		updatedEntriesChan: make(chan EntryStatus, config.NumberOfSegments*1024),
+		updatedEntriesChan: make(chan *storage.CacheEntry, config.NumberOfSegments*1024),
 		Storage:            file_storage.NewFileCacheStorage(config.FilePath, config.MaxFileSize, time.Second*5),
 	}
 
 	sr.initFromStorage()
 
+	go sr.setupUpdateProxy()
+
 	return sr
+}
+
+func (sr *ShardRing) setupUpdateProxy() {
+
+	for {
+		update := <-sr.updatedEntriesChan
+
+		sr.Storage.OnEntryUpdated(update)
+	}
+
 }
 
 func (sr *ShardRing) initFromStorage() {
