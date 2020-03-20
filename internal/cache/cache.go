@@ -5,9 +5,9 @@ import (
 	"hash/fnv"
 	"time"
 
-	"github.com/mohsenShakiba/distributed-cache/file_storage"
-	"github.com/mohsenShakiba/distributed-cache/shard"
-	"github.com/mohsenShakiba/distributed-cache/storage"
+	"github.com/mohsenShakiba/distributed-cache/internal/file_storage"
+	"github.com/mohsenShakiba/distributed-cache/internal/shard"
+	"github.com/mohsenShakiba/distributed-cache/internal/storage"
 )
 
 type Cache struct {
