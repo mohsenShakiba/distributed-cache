@@ -6,8 +6,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/mohsenShakiba/distributed-cache/arraypool"
-	"github.com/mohsenShakiba/distributed-cache/storage"
+	"github.com/mohsenShakiba/distributed-cache/pkg/arraypool"
+	"github.com/mohsenShakiba/distributed-cache/pkg/storage"
 )
 
 type Entry struct {
